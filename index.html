@@ -30,7 +30,7 @@ h2{display:flex;align-items:center;gap:10px;margin:0;font-size:19px;font-weight:
 .pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}
 .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:14px}
 .card{background:var(--card);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px;box-shadow:0 2px 10px rgba(23,32,46,.06);border:1px solid var(--line);border-top:5px solid var(--green)}
-.card.pag{border-top-color:var(--amber)}.card.tarde{border-top-color:var(--red)}
+.card.pag{border-top-color:var(--amber)}.card.ok{border-top-color:var(--blue);opacity:.9}.card.tarde{border-top-color:var(--red)}
 .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .prod{font-size:17px;font-weight:700;line-height:1.3;margin:0}
 .qty{display:inline-block;padding:1px 8px;margin-right:6px;border-radius:999px;background:var(--blue-soft);color:var(--blue);font-size:13px;font-weight:700}
@@ -111,6 +111,7 @@ h2{display:flex;align-items:center;gap:10px;margin:0;font-size:19px;font-weight:
   </div>
   <section class="sec"><h2>Pagados <span class="pill" style="background:#fff4e0;color:#b45309">esperando envío</span></h2><div class="list" id="l-pag"></div></section>
   <section class="sec"><h2>Enviados <span class="pill" style="background:#e7f7ee;color:#15803d">de camino a Algeciras</span></h2><div class="list" id="l-env"></div></section>
+  <section class="sec"><h2>Entregados <span class="pill" style="background:#e8f0ff;color:#1d4ed8">confirma la recepción</span></h2><div class="list" id="l-ent"></div></section>
   <p class="foot">Datos leídos de «Mis compras» en Cardmarket. Los días se cuentan desde que el vendedor lo marcó como enviado.</p>
 </main>
 
@@ -146,25 +147,26 @@ document.getElementById('upd').textContent='Actualizado el '+d3.utcFormat('%d/%m
 function show(id){document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.tab===id)));['camino','precios'].forEach(k=>document.getElementById(k).hidden=k!==id);if(id==='precios')drawPrecios();history.replaceState(null,'','#'+id);}
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>show(t.dataset.tab));
 // de camino
-const C=DATA.camino;
+const ALL=DATA.camino;const C=ALL.filter(d=>d.estado!=="Entregado");
 const dias=d=>{const ref=d.estado==='Enviado'?d.enviado:d.pagado;return Math.floor((Date.now()-new Date(ref))/864e5);};
 document.getElementById('s-n').textContent=C.length;
 document.getElementById('s-eur').textContent=eur(d3.sum(C,d=>d.total||0),0);
 const nt=C.filter(d=>d.estado==='Enviado'&&dias(d)>=7).length;
 document.getElementById('s-tarde').textContent=nt;if(nt)document.getElementById('s-tarde-box').classList.add('warn');
 function lista(el,estado){
-  const rows=C.filter(d=>d.estado===estado).sort((a,b)=>String(a.enviado||a.pagado).localeCompare(String(b.enviado||b.pagado)));
+  const rows=ALL.filter(d=>d.estado===estado).sort((a,b)=>String(a.enviado||a.pagado).localeCompare(String(b.enviado||b.pagado)));
   if(!rows.length){el.append(mk('p','empty',estado==='Pagado'?'Nada pendiente de envío.':'Nada de camino ahora mismo.'));return;}
   rows.forEach(d=>{
     const n=dias(d),tarde=estado==='Enviado'&&n>=7;
-    const card=mk('article','card'+(estado==='Pagado'?' pag':'')+(tarde?' tarde':''));
+    const card=mk('article','card'+(estado==='Pagado'?' pag':'')+(tarde?' tarde':'')+(estado==='Entregado'?' ok':''));
     const top=mk('div','top'),prod=mk('h3','prod');const m=String(d.contenido).match(/^(\d+)x\s*(.*)$/);
     if(m){prod.append(mk('span','qty',m[1]+'×'),document.createTextNode(m[2]));}else prod.textContent=d.contenido;
     top.append(prod,mk('div','total',d.total==null?'':eur(d.total)));card.append(top);
     const from=mk('div','from');[['👤',d.vendedor],['📍',d.pais],['🚚',d.transportista||'—']].forEach(([i,t])=>{const s=mk('span','tag');s.append(document.createTextNode(i+' '),mk('b',null,t));from.append(s);});card.append(from);
     const dt=n===0?'hoy':n===1?'1 día':n+' días';const st=mk('div','steps');
     const S=(c,l,s)=>{const e=mk('div','step '+c);e.append(mk('i'),mk('span','t',l),mk('span',null,s));return e;};
-    if(estado==='Pagado')st.append(S('done','Pagado',fmt(new Date(d.pagado))),S('now pend','Envío','sin enviar'),S('','Llegada','—'));
+    if(estado==='Entregado')st.append(S('done','Pagado',fmt(new Date(d.pagado))),S('done','Enviado',fmt(new Date(d.enviado))),S('done','Entregado',fmt(new Date(d.entregado||d.ultimo_revisado))));
+    else if(estado==='Pagado')st.append(S('done','Pagado',fmt(new Date(d.pagado))),S('now pend','Envío','sin enviar'),S('','Llegada','—'));
     else st.append(S('done','Pagado',fmt(new Date(d.pagado))),S('done','Enviado',fmt(new Date(d.enviado))),S('now'+(tarde?' tarde':''),'Llegada',(tarde?'⚠️ ':'')+dt+' en camino'));
     card.append(st);
     if(d.ultimo){const u=mk('div','last'),tx=mk('div');tx.append(mk('span','k','Último estado · '+fmt(new Date(d.ultimo_revisado))),mk('span','x',d.ultimo));u.append(mk('span',null,'📍'),tx);card.append(u);}
@@ -174,7 +176,7 @@ function lista(el,estado){
     if(d.seguimiento)card.append(mk('span','code','Nº seguimiento: '+d.seguimiento));
     el.append(card);});
 }
-lista(document.getElementById('l-pag'),'Pagado');lista(document.getElementById('l-env'),'Enviado');
+lista(document.getElementById('l-pag'),'Pagado');lista(document.getElementById('l-env'),'Enviado');lista(document.getElementById('l-ent'),'Entregado');
 // precios
 let drawn=false;
 function drawPrecios(){
