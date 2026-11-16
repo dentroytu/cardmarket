@@ -176,7 +176,7 @@ function lista(el,estado){
     if(d.seguimiento)card.append(mk('span','code','Nº seguimiento: '+d.seguimiento));
     el.append(card);});
 }
-lista(document.getElementById('l-pag'),'Pagado');lista(document.getElementById('l-env'),'Enviado');lista(document.getElementById('l-ent'),'Entregado');
+lista(document.getElementById('l-pag'),'Pagado');lista(document.getElementById('l-env'),'Enviado');lista(document.getElementById('l-ent'),'Entregado');if(!ALL.some(d=>d.estado==='Entregado'))document.getElementById('l-ent').closest('section').style.display='none';
 // precios
 let drawn=false;
 function drawPrecios(){
